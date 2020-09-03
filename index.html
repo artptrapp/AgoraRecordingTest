@@ -17,13 +17,14 @@
 
     // ### Constants
 
-    const AGORA_API_KEY = ""
-    const SECRET_KEY = ""
-    const ACCESS_KEY = ""
-    const AGORA_BUCKET = ""
+    const AGORA_API_KEY = "5aec3bd2e94348609d0e09ff6e005f0b"
+    const SECRET_KEY = "AKIAQFTPJE3TI4S4JXBR"
+    const ACCESS_KEY = "EN+OSvFETBVr35n4MgB9EP067MjKqBzH3+F/XTdQ"
+    const AGORA_BUCKET = "agora-recording-bucket"
     const TEST_USER_ID = "55"
     const TEST_CHANNEL_ID = "TEST_55"
     const AGORA_URL = `https://api.agora.io/v1/apps/${AGORA_API_KEY}/cloud_recording`
+    const RECORDER_ID = "55555"
 
     // ### End constants
 
@@ -58,7 +59,7 @@
     document.getElementById('stream').onclick = () => {
         startStreaming()
     }
-    
+
     document.getElementById('stream').onclick = () => {
         startStreaming()
     }
@@ -77,7 +78,7 @@
     var SID = ''
 
     const DEFAULT_BODY = {
-        "uid": `${TEST_USER_ID}`,
+        "uid": `${RECORDER_ID}`,
         "cname": TEST_CHANNEL_ID,
         "clientRequest": {}
     }
@@ -86,7 +87,7 @@
 
     function startStreaming() {
         rtc.client = AgoraRTC.createClient({
-            mode: "live",
+            mode: "rtc",
             codec: "h264"
         });
         rtc.client.init(AGORA_API_KEY, function () {
@@ -98,6 +99,7 @@
 
     function initSuccess() {
         rtc.client.join(null, TEST_CHANNEL_ID, TEST_USER_ID, function (uid) {
+            alert(uid)
             rtc.params.uid = uid;
             joinSuccess()
         }, function (err) {
@@ -153,27 +155,27 @@
         const resourceId = acquireJson.resourceId
 
         const startBody = {
-            "uid": `${TEST_USER_ID}`,
             "cname": TEST_CHANNEL_ID,
+            "uid": `${RECORDER_ID}`,
             "clientRequest": {
-                "storageConfig": {
-                    "secretKey": SECRET_KEY,
-                    "region": 0,
-                    "accessKey": ACCESS_KEY,
-                    "bucket": AGORA_BUCKET,
-                    "vendor": 1
-                },
                 "recordingConfig": {
-                    "maxIdleTime": 10,
+                    "maxIdleTime": 30,
                     "streamTypes": 2,
                     "channelType": 0,
                     "videoStreamType": 1,
                     "subscribeUidGroup": 0
+                },
+                "storageConfig": {
+                    "vendor": 1,
+                    "region": 0,
+                    "bucket": AGORA_BUCKET,
+                    "accessKey": ACCESS_KEY,
+                    "secretKey": SECRET_KEY
                 }
             }
         }
 
-        const startResponse = await fetch(AGORA_URL + `/resourceid/${resourceId}/mode/individual/start`, {
+        const startResponse = await fetch(AGORA_URL + `/resourceid/${resourceId}/mode/mix/start`, {
             method: "POST",
             headers: {
                 "Authorization": "Basic ZjI5NTJlYmU2NjJjNDc1YWI1NjdiMzcxMWZhYzJiM2I6MjYxM2YyMzkxNWFiNDc1MWFiN2NmNTU3ZjI4MzE2ZGI=",
@@ -203,10 +205,10 @@
         }
 
         IS_QUERYING = true
-        
+
         let fetchAmount = 0
         QUERY_INTERVAL_ID = setInterval(async () => {
-            const fetchResult = await fetch(AGORA_URL + `/resourceid/${RID}/sid/${SID}/mode/individual/query`, {
+            const fetchResult = await fetch(AGORA_URL + `/resourceid/${RID}/sid/${SID}/mode/mix/query`, {
                 method: "GET",
                 headers: {
                     "Authorization": "Basic ZjI5NTJlYmU2NjJjNDc1YWI1NjdiMzcxMWZhYzJiM2I6MjYxM2YyMzkxNWFiNDc1MWFiN2NmNTU3ZjI4MzE2ZGI=",
@@ -231,7 +233,7 @@
             return alert('Cannot stop as there is no recording happening')
         }
 
-        const fetchResult = await fetch(AGORA_URL + `/resourceid/${RID}/sid/${SID}/mode/individual/stop`, {
+        const fetchResult = await fetch(AGORA_URL + `/resourceid/${RID}/sid/${SID}/mode/mix/stop`, {
             method: "POST",
             headers: {
                 "Authorization": "Basic ZjI5NTJlYmU2NjJjNDc1YWI1NjdiMzcxMWZhYzJiM2I6MjYxM2YyMzkxNWFiNDc1MWFiN2NmNTU3ZjI4MzE2ZGI=",
@@ -243,7 +245,7 @@
         const stopJson = await fetchResult.json()
         console.log(stopJson)
     }
-    
+
     // End cloud recording handling
 
 </script>
