@@ -1,0 +1,251 @@
+<html>
+
+<head>
+    <script src="https://cdn.agora.io/sdk/release/AgoraRTCSDK-3.1.0.js"></script>
+</head>
+
+<body>
+    <button id="stream">Start Streaming</button>
+    <button id="query">Start querying</button>
+    <button id="stop_query">Stop querying</button>
+    <button id="record">Start Recording to the cloud</button>
+    <button id="stop">Stop Recording to the cloud</button>
+    <div id="local_stream"></div>
+</body>
+
+<script type="text/javascript">
+
+    // ### Constants
+
+    const AGORA_API_KEY = ""
+    const SECRET_KEY = ""
+    const ACCESS_KEY = ""
+    const AGORA_BUCKET = ""
+    const TEST_USER_ID = "55"
+    const TEST_CHANNEL_ID = "TEST_55"
+    const AGORA_URL = `https://api.agora.io/v1/apps/${AGORA_API_KEY}/cloud_recording`
+
+    // ### End constants
+
+    var rtc = {
+        client: null,
+        joined: false,
+        published: false,
+        localStream: null,
+        remoteStreams: [],
+        params: {}
+    };
+
+    // ### Flags that control the flow
+
+    // ### End flags that control the flow
+
+    var HAS_PUBLISHED_SUCCESSFULLY = false
+    var IS_RECORDING = false
+    var IS_QUERYING = false
+    var QUERY_INTERVAL_ID = -1
+
+    // ### Click handlers
+
+    document.getElementById('record').onclick = () => {
+        startRecording()
+    }
+
+    document.getElementById('stop').onclick = () => {
+        stopRecording()
+    }
+
+    document.getElementById('stream').onclick = () => {
+        startStreaming()
+    }
+    
+    document.getElementById('stream').onclick = () => {
+        startStreaming()
+    }
+
+    document.getElementById('stream').onclick = () => {
+        startStreaming()
+    }
+
+    document.getElementById('query').onclick = () => {
+        query()
+    }
+
+    // ### End click handlers
+
+    var RID = ''
+    var SID = ''
+
+    const DEFAULT_BODY = {
+        "uid": `${TEST_USER_ID}`,
+        "cname": TEST_CHANNEL_ID,
+        "clientRequest": {}
+    }
+
+    // ### Streaming handling
+
+    function startStreaming() {
+        rtc.client = AgoraRTC.createClient({
+            mode: "live",
+            codec: "h264"
+        });
+        rtc.client.init(AGORA_API_KEY, function () {
+            initSuccess()
+        }, (err) => {
+            console.error(err);
+        });
+    }
+
+    function initSuccess() {
+        rtc.client.join(null, TEST_CHANNEL_ID, TEST_USER_ID, function (uid) {
+            rtc.params.uid = uid;
+            joinSuccess()
+        }, function (err) {
+            console.error("client join failed", err);
+        });
+    }
+
+    function joinSuccess() {
+        rtc.localStream = AgoraRTC.createStream({
+            streamID: rtc.params.uid,
+            audio: true,
+            video: true,
+            screen: false,
+        });
+
+        rtc.localStream.init(function (a) {
+            rtc.localStream.play("local_stream");
+            localStreamSuccess()
+        }, function (err) {
+            console.error("init local stream failed ", err);
+        });
+    }
+
+    function localStreamSuccess() {
+        // Publish the local stream
+        rtc.client.publish(rtc.localStream, function (err) {
+            console.log("publish failed");
+            console.error(err);
+            HAS_PUBLISHED_SUCCESSFULLY = false
+        });
+
+        HAS_PUBLISHED_SUCCESSFULLY = true
+    }
+
+    // ### End streaming handling
+
+    // ### Cloud recording handling
+
+    async function startRecording() {
+
+        const acquireResponse = await fetch(AGORA_URL + '/acquire', {
+            method: "POST",
+            headers: {
+                "Authorization": "Basic ZjI5NTJlYmU2NjJjNDc1YWI1NjdiMzcxMWZhYzJiM2I6MjYxM2YyMzkxNWFiNDc1MWFiN2NmNTU3ZjI4MzE2ZGI=",
+                "content-type": "application/json"
+            },
+            body: JSON.stringify(DEFAULT_BODY)
+        })
+
+        const acquireJson = await acquireResponse.json()
+        console.log('acquire result', acquireJson)
+
+        const resourceId = acquireJson.resourceId
+
+        const startBody = {
+            "uid": `${TEST_USER_ID}`,
+            "cname": TEST_CHANNEL_ID,
+            "clientRequest": {
+                "storageConfig": {
+                    "secretKey": SECRET_KEY,
+                    "region": 0,
+                    "accessKey": ACCESS_KEY,
+                    "bucket": AGORA_BUCKET,
+                    "vendor": 1
+                },
+                "recordingConfig": {
+                    "maxIdleTime": 10,
+                    "streamTypes": 2,
+                    "channelType": 0,
+                    "videoStreamType": 1,
+                    "subscribeUidGroup": 0
+                }
+            }
+        }
+
+        const startResponse = await fetch(AGORA_URL + `/resourceid/${resourceId}/mode/individual/start`, {
+            method: "POST",
+            headers: {
+                "Authorization": "Basic ZjI5NTJlYmU2NjJjNDc1YWI1NjdiMzcxMWZhYzJiM2I6MjYxM2YyMzkxNWFiNDc1MWFiN2NmNTU3ZjI4MzE2ZGI=",
+                "content-type": "application/json"
+            },
+            body: JSON.stringify(startBody)
+        })
+
+        const startJson = await startResponse.json()
+        console.log('start result', startJson)
+
+        const sid = startJson.sid
+
+        IS_RECORDING = true
+
+        RID = resourceId
+        SID = sid
+    }
+
+    async function query() {
+        if (!IS_RECORDING) {
+            return alert('Cannot query as it is not')
+        }
+
+        if (IS_QUERYING) {
+            return alert('Already querying')
+        }
+
+        IS_QUERYING = true
+        
+        let fetchAmount = 0
+        QUERY_INTERVAL_ID = setInterval(async () => {
+            const fetchResult = await fetch(AGORA_URL + `/resourceid/${RID}/sid/${SID}/mode/individual/query`, {
+                method: "GET",
+                headers: {
+                    "Authorization": "Basic ZjI5NTJlYmU2NjJjNDc1YWI1NjdiMzcxMWZhYzJiM2I6MjYxM2YyMzkxNWFiNDc1MWFiN2NmNTU3ZjI4MzE2ZGI=",
+                    "content-type": "application/json"
+                },
+            })
+
+            const fetchJson = await fetchResult.json()
+            console.log(fetchJson)
+            fetchAmount++
+
+        }, 3000)
+    }
+
+    function stopQuerying() {
+        clearInterval(QUERY_INTERVAL_ID)
+        IS_QUERYING = false
+    }
+
+    async function stopRecording() {
+        if (!IS_RECORDING) {
+            return alert('Cannot stop as there is no recording happening')
+        }
+
+        const fetchResult = await fetch(AGORA_URL + `/resourceid/${RID}/sid/${SID}/mode/individual/stop`, {
+            method: "POST",
+            headers: {
+                "Authorization": "Basic ZjI5NTJlYmU2NjJjNDc1YWI1NjdiMzcxMWZhYzJiM2I6MjYxM2YyMzkxNWFiNDc1MWFiN2NmNTU3ZjI4MzE2ZGI=",
+                "content-type": "application/json"
+            },
+            body: JSON.stringify(DEFAULT_BODY)
+        })
+
+        const stopJson = await fetchResult.json()
+        console.log(stopJson)
+    }
+    
+    // End cloud recording handling
+
+</script>
+
+</html>
